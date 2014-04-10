@@ -32,3 +32,4 @@ struct UDPThreadpassIn{
 #endif /* UDPMESSAGE_H_ */
 void * SendUDPThread(void* point);
 void * ReceiveUDPThread(void*  point2);
+int  SendUDPBuffer(void *point);

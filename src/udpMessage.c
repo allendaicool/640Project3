@@ -16,8 +16,22 @@
 
 
 #include "udpMessage.h"
-struct sockaddr_in  * ClientAddr =NULL ;
 
+struct sockaddr_in  * ClientAddr =NULL ;
+char blockBuffer[256] ={0};
+int paste = 0 ;
+
+int  SendUDPBuffer(void *point)
+{
+	struct UDPThreadpassIn * pointstr = (struct UDPThreadpassIn *) point;
+	int l = 256;
+	if( sendto(pointstr->arg, blockBuffer,l,0,(struct sockaddr * )(ClientAddr),sizeof(struct sockaddr_in )) == -1)
+	{
+		perror("sendTo failed");
+		exit(0);
+	}
+	return 1 ;
+}
 
 
 void * SendUDPThread(void * point)
@@ -25,24 +39,14 @@ void * SendUDPThread(void * point)
 	struct UDPThreadpassIn * pointstr = (struct UDPThreadpassIn *) point;
 	int Isclient = pointstr->whoreceive ;
 	char c;
-	char blockBuffer[256];
-	int paste = 0 ;
-	int flush = 0 ;
+
 	while (1) {
 		int l=255;
 
-		if(Isclient == 0 &&ClientAddr !=0 && flush ==0)
-		{
-			if( sendto(pointstr->arg, blockBuffer,l,0,(struct sockaddr * )(ClientAddr),sizeof(struct sockaddr_in )) == -1)
-			{
-				perror("sendTo failed");
-				exit(0);
-				break;
-			}
-			flush  = 1 ;
-		}
+		//if(!(paste== 1 && Isclient == 0 && flush==0)) //
+		//{
 		c=fgetc(stdin);
-		char  buffer[256]={c};
+		//}
 		// whoSend == 0 is server  whosend == 1 is the client
 		if(c == EOF )
 		{
@@ -54,18 +58,25 @@ void * SendUDPThread(void * point)
 			{
 				if(  paste == 0)
 				{
-					strcat(blockBuffer, &c);
+					bzero(blockBuffer,256);
+					//blockBuffer[0] = c;
 					paste = 1 ;
 				}
 				char temp[255];
 				bzero(temp,255);
 				fgets(temp,l,stdin);
+				//printf(temp);
+				strncat(blockBuffer,&c,1);
 				strcat(blockBuffer,temp);
 			}
 			else {
+				char  buffer[256]={c};
 				char temp[255];
 				bzero(temp,255);
 				fgets(temp,l,stdin);
+				//printf("should be working\n");
+				//printf(temp);
+				//printf("\n");
 				strcat(buffer,temp);
 				if(Isclient ==1 )
 				{
@@ -78,19 +89,14 @@ void * SendUDPThread(void * point)
 				}
 				else
 				{
-
 					if( sendto(pointstr->arg, buffer,l,0,(struct sockaddr * )(ClientAddr),sizeof(struct sockaddr_in)) == -1)
 					{
 						perror("sendTo failed");
 						exit(0);
 						break;
 					}
-
-
 				}
-
 			}
-
 		}
 	}
 }
@@ -109,7 +115,7 @@ void *ReceiveUDPThread(void* point)
 		struct sockaddr_in pointer ;
 		socklen_t addrlen = sizeof(pointer);
 		size_t n;
-		if( (n = recvfrom(sockfd, buffer, 255, 0, (struct sockaddr *)&pointer, &addrlen))==-1)
+		if( (n = recvfrom(sockfd, buffer, 256, 0, (struct sockaddr *)&pointer, &addrlen))==-1)
 		{
 			perror("led");
 			exit(0);
@@ -125,6 +131,10 @@ void *ReceiveUDPThread(void* point)
 				ClientAddr->sin_addr = pointer.sin_addr;
 				ClientAddr->sin_family = pointer.sin_family;
 				ClientAddr->sin_port = pointer.sin_port;
+				if(blockBuffer[0]!=0)
+				{
+					SendUDPBuffer(point);
+				}
 			}
 			fputs(buffer,stdout);
 
